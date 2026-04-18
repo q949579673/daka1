@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>轻伴 - 全端商业演示系统</title>
+    
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/vant/lib/index.css" />
+    <script src="https://unpkg.com/vant/lib/vant.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root { --p-color: #10b981; --d-color: #0284c7; --a-color: #6366f1; --bg: #f4f6f8; }
+        body { background: var(--bg); margin: 0; padding-bottom: 70px; font-family: -apple-system, sans-serif; }
+        
+        .master-header { background: #111; color: #fff; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; font-size: 14px; }
+        .role-btn { background: #333; border: 1px solid #555; padding: 4px 12px; border-radius: 15px; color: #eee; font-size: 12px; }
+        
+        .card { background: #fff; border-radius: 12px; padding: 16px; margin: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+        .card-title { font-size: 16px; font-weight: bold; margin-bottom: 12px; color: #333; display: flex; align-items: center; gap: 6px; }
+        .card-title i { color: var(--p-color); font-size: 18px; }
+        
+        .login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: #fff; z-index: 999; overflow-y: auto; padding-top: 40px; }
+        .login-logo { width: 60px; height: 60px; background: var(--p-color); color: #fff; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 15px; font-weight: bold; }
+        
+        .post { border-bottom: 1px solid #f0f0f0; padding-bottom: 15px; margin-bottom: 15px; }
+        .post:last-child { border: none; margin-bottom: 0; padding-bottom: 0; }
+        .post-top { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .avatar { width: 36px; height: 36px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 10px; }
+        .tag-list { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+        .tag { font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #f0fdf4; color: #16a34a; }
+        .dr-reply { background: #f0f9ff; border-left: 3px solid var(--d-color); padding: 10px; border-radius: 0 8px 8px 0; font-size: 13px; margin-top: 10px; }
+        .action-bar { display: flex; gap: 15px; color: #888; font-size: 13px; margin-top: 10px; }
+        
+        .rank-item { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #fafafa; }
+        .rank-num { width: 30px; font-weight: bold; font-style: italic; color: #999; text-align: center; }
+        .badge-hot { background: #fee2e2; color: #ef4444; font-size: 10px; padding: 1px 4px; border-radius: 4px; border: 1px solid #fca5a5; }
+        .badge-dr { background: #e0f2fe; color: #0284c7; font-size: 10px; padding: 1px 4px; border-radius: 4px; }
+        
+        .van-field__label { font-weight: bold; color: #444; }
+        .input-group { background: #f9fafb; border-radius: 8px; padding: 5px 0; margin-bottom: 10px; }
+        .stat-block { flex: 1; padding: 15px; border-radius: 8px; text-align: center; }
+
+        .upload-wrapper { background: #f9fafb; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 15px; }
+        .text-green { color: #10b981; font-weight: bold; font-size: 16px; }
+        .word-tag { display: inline-flex; align-items: center; background: #fee2e2; color: #ef4444; padding: 4px 10px; border-radius: 20px; font-size: 13px; margin: 0 8px 8px 0; }
+        
+        /* 管理端分类标题样式 */
+        .admin-section-title { font-size: 13px; color: #666; margin: 15px 15px 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div v-if="!isLoggedIn" class="login-screen">
+        <div style="text-align: center; margin-bottom: 30px;">
+            <div class="login-logo">轻</div>
+            <h2 style="margin:0; color:#333;">轻伴健康管理</h2>
+            <p style="color:#999; font-size:14px; margin-top:8px;" v-if="loginStep === 1">输入手机号，开启健康之旅</p>
+            <p style="color:#999; font-size:14px; margin-top:8px;" v-if="loginStep === 2">完善档案，定制专属方案</p>
+        </div>
+        
+        <div v-if="loginStep === 1">
+            <van-cell-group inset>
+                <van-field v-model="loginForm.phone" type="tel" label="手机号" placeholder="请输入手机号" />
+                <van-field v-model="loginForm.sms" center clearable label="验证码" placeholder="请输入短信验证码">
+                    <template #button>
+                        <van-button size="small" type="primary" color="#10b981" plain>获取验证码</van-button>
+                    </template>
+                </van-field>
+            </van-cell-group>
+            <div style="padding: 30px 20px;">
+                <van-button block round type="primary" color="#10b981" @click="loginStep = 2">登录 / 注册</van-button>
+                <div style="text-align: center; margin-top: 15px; font-size: 12px; color: #999;">理论后续不清缓存无需再次输入密码</div>
+            </div>
+        </div>
+
+        <div v-if="loginStep === 2">
+            <div style="padding: 0 20px 10px; font-size: 14px; font-weight: bold; color: #555;">首次使用，请建立健康档案：</div>
+            
+            <van-cell-group inset title="内部保密信息 (后台导出专用)">
+                <van-field v-model="loginForm.realName" label="真实姓名" placeholder="必填，用于医学随访记录" />
+            </van-cell-group>
+
+            <van-cell-group inset title="社区展示信息 (对外唯一标识)" style="margin-top: 15px;">
+                <van-field v-model="loginForm.nickname" label="社区昵称" placeholder="必填，如：自律的小猫" />
+            </van-cell-group>
+
+            <van-cell-group inset title="基础身体数据" style="margin-top: 15px;">
+                <van-field v-model="loginForm.height" type="number" label="身高 (cm)" placeholder="输入身高" input-align="right" />
+                <van-field v-model="loginForm.weight" type="number" label="初始体重 (kg)" placeholder="输入当前体重" input-align="right" />
+            </van-cell-group>
+            
+            <div style="padding: 10px 20px; font-size: 12px; color: #999; line-height: 1.6;">
+                <van-icon name="info-o" /> 在此平台您只以【社区昵称】展示。<br>
+                <van-icon name="shield-o" /> 真名与绝对体重仅供后台医学统计使用，在广场中可选择性隐藏，请放心填写。
+            </div>
+
+            <div style="padding: 20px;">
+                <van-button block round type="primary" color="#10b981" @click="doLogin">完成建档并进入</van-button>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="isLoggedIn" class="master-header" :style="{ borderBottom: `3px solid ${roles[role].color}` }">
+        <div><van-icon name="desktop-o" /> {{ roles[role].title }}</div>
+        <button class="role-btn" @click="showRolePicker = true">切换身份视角 <van-icon name="exchange" /></button>
+    </div>
+
+    <div v-if="isLoggedIn && role === 'patient'">
+        
+        <div v-show="pTab === 'record'">
+            <div class="card">
+                <div class="card-title"><van-icon name="user-o" /> 身体指标录入</div>
+                <div class="input-group">
+                    <van-field label="今日体重" placeholder="必填 (kg)" type="number" input-align="right" />
+                    <van-field label="体脂率" placeholder="可选 (%)" type="number" input-align="right" />
+                </div>
+                
+                <div style="margin: 10px 0; padding: 0 5px;">
+                    <van-checkbox v-model="showBodyMetrics" shape="square" checked-color="#10b981">录入腰围与臀围</van-checkbox>
+                </div>
+                
+                <div class="input-group" v-if="showBodyMetrics">
+                    <van-field label="腰围" placeholder="输入腰围 (cm)" type="number" input-align="right" />
+                    <van-field label="臀围" placeholder="输入臀围 (cm)" type="number" input-align="right" />
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><van-icon name="fire-o" style="color:#f59e0b;" /> 饮食与消耗</div>
+                
+                <div style="font-weight:bold; font-size:14px; margin-bottom:5px;">🥗 饮食记录</div>
+                <div class="upload-wrapper">
+                    <div style="font-size:12px; color:#999; margin-bottom:8px;">请上传您的三餐照片：</div>
+                    <van-uploader v-model="dietFiles" multiple max-count="3" upload-text="传饮食图" />
+                </div>
+
+                <van-field label="饮食达标度" is-link arrow-direction="down" style="padding-left:0; background:transparent;">
+                    <template #input>
+                        <van-radio-group direction="horizontal" style="font-size: 12px;">
+                            <van-radio name="1" checked-color="#10b981">优秀</van-radio>
+                            <van-radio name="2" checked-color="#f59e0b">一般</van-radio>
+                            <van-radio name="3" checked-color="#ef4444">放纵</van-radio>
+                        </van-radio-group>
+                    </template>
+                </van-field>
+                
+                <van-field label="今日饮水" input-align="right" style="padding-left:0; background:transparent;">
+                    <template #input>
+                        <van-stepper v-model="form.water" step="200" min="0" max="4000" theme="round" button-size="22" />
+                        <span style="margin-left: 8px; font-size: 13px; color: #666;">ml</span>
+                    </template>
+                </van-field>
+                
+                <div style="font-weight:bold; font-size:14px; margin: 15px 0 5px;">🏃 运动记录</div>
+                <div class="upload-wrapper">
+                    <div style="font-size:12px; color:#999; margin-bottom:8px;">请上传运动截图或照片：</div>
+                    <van-uploader v-model="sportFiles" multiple max-count="2" upload-text="传运动图" />
+                </div>
+
+                <van-field label="运动时长" placeholder="分钟" type="digit" input-align="right" style="padding-left:0; background:transparent;"/>
+                <div style="padding: 0 0 10px;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 8px;">选择运动标签</div>
+                    <van-checkbox-group direction="horizontal" style="gap: 8px;">
+                        <van-checkbox name="a" shape="square" icon-size="14px">力量训练</van-checkbox>
+                        <van-checkbox name="b" shape="square" icon-size="14px">有氧跑步</van-checkbox>
+                        <van-checkbox name="c" shape="square" icon-size="14px">散步</van-checkbox>
+                        <van-checkbox name="d" shape="square" icon-size="14px">动感单车</van-checkbox>
+                    </van-checkbox-group>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><van-icon name="clock-o" style="color:#6366f1;" /> 生活与代谢</div>
+                <van-field label="昨夜睡眠" input-align="right">
+                    <template #input>
+                        <van-stepper v-model="form.sleep" step="0.5" min="0" max="14" theme="round" button-size="22" />
+                        <span style="margin-left: 8px; font-size: 13px; color: #666;">小时</span>
+                    </template>
+                </van-field>
+                <van-field label="排便情况" is-link arrow-direction="down">
+                    <template #input>
+                        <van-radio-group direction="horizontal" style="font-size: 12px;">
+                            <van-radio name="a" checked-color="#10b981">顺畅</van-radio>
+                            <van-radio name="b" checked-color="#f59e0b">困难</van-radio>
+                            <van-radio name="c" checked-color="#ef4444">无</van-radio>
+                        </van-radio-group>
+                    </template>
+                </van-field>
+                <van-field type="textarea" rows="2" autosize placeholder="记录今天的减重感悟或碎碎念..." style="background:#f9fafb; border-radius:8px; margin-top:10px;" />
+            </div>
+            
+            <div style="padding: 0 12px 20px;">
+                <van-button block round color="#10b981" style="box-shadow: 0 4px 15px rgba(16,185,129,0.3);">提交完整健康日志</van-button>
+            </div>
+        </div>
+
+        <div v-show="pTab === 'square'">
+            <div class="card" v-for="(post, idx) in feed" :key="idx">
+                <div class="post">
+                    <div class="post-top">
+                        <div style="display: flex; align-items: center;">
+                            <div class="avatar">{{ post.name[0] }}</div>
+                            <div>
+                                <div style="font-weight: bold; font-size: 14px;">
+                                    {{ post.name }} 
+                                    <span v-if="post.isPinned" class="badge-hot">置顶</span>
+                                </div>
+                                <div style="font-size: 11px; color: #999;">{{ post.time }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tag-list">
+                        <span class="tag">🏃 运动 {{ post.sport }}分钟</span>
+                        <span class="tag" style="background:#e0f2fe; color:#0284c7;">💧 饮水 2000ml</span>
+                        <span class="tag" style="background:#fffbeb; color:#d97706;">🥗 饮食达标</span>
+                    </div>
+                    <div style="font-size: 14px; line-height: 1.5; color: #333;">{{ post.content }}</div>
+                    <div v-if="post.drReply" class="dr-reply">
+                        <div style="font-weight: bold; color: var(--d-color); margin-bottom: 4px;">
+                            <van-icon name="checked" /> {{ post.drName }} 医生点评：
+                        </div>
+                        {{ post.drReply }}
+                    </div>
+                    <div class="action-bar">
+                        <span><van-icon name="good-job-o" /> {{ post.likes }} 赞</span>
+                        <span><van-icon name="chat-o" /> 评论</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-show="pTab === 'game'">
+            <div class="card" style="background: linear-gradient(135deg, #10b981, #059669); color: white; text-align: center;">
+                <div style="font-size: 14px; opacity: 0.9;">我的可用积分</div>
+                <div style="font-size: 40px; font-weight: bold; margin: 10px 0;">3,850</div>
+                <div style="display:flex; justify-content:center; gap:20px; font-size:12px; opacity:0.8;">
+                    <span>累计打卡: 42天</span>
+                    <span>今日排行: 第5名</span>
+                </div>
+                <div style="margin-top:15px; font-size:13px;">
+                    <span @click="showPointsHistory = true" style="background:rgba(255,255,255,0.2); padding:5px 15px; border-radius:20px; cursor:pointer;">查看积分明细流水 ></span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <van-tabs v-model:active="rankTab" color="#10b981" shrink>
+                    <van-tab title="坚持打卡榜"></van-tab>
+                    <van-tab title="相对减重榜"></van-tab>
+                    <van-tab title="积分总榜"></van-tab>
+                </van-tabs>
+                <div style="margin-top: 15px;">
+                    <div v-for="(user, i) in rankList" :key="i" class="rank-item">
+                        <div class="rank-num" :class="'rank-'+(i+1)">{{ i+1 }}</div>
+                        <div class="avatar" style="width:30px; height:30px; font-size:12px;">{{ user.name[0] }}</div>
+                        <div style="flex:1;">
+                            <div style="font-size:14px; font-weight:bold;">{{ user.name }}</div>
+                            <div style="font-size:12px; color:#999;" v-if="rankTab===0">连续坚持 {{ user.days }} 天</div>
+                            <div style="font-size:12px; color:#999;" v-if="rankTab===1">已减去初始体重 {{ user.percent }}%</div>
+                        </div>
+                        <div style="font-weight:bold; color:#10b981;" v-if="rankTab===2">{{ user.pts }} 分</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-show="pTab === 'dashboard'">
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; margin-bottom:15px; text-align:center;">
+                    <div style="flex:1;"><div style="font-size:12px;color:#666;">当前BMI</div><div style="font-size:22px;font-weight:bold;color:#10b981;">21.8</div></div>
+                    <div style="flex:1;"><div style="font-size:12px;color:#666;">累计减重</div><div style="font-size:22px;font-weight:bold;color:#10b981;">-6.5 kg</div></div>
+                </div>
+                <div class="card-title">体重与围度趋势分析</div>
+                <div style="height: 220px;"><canvas id="healthChart"></canvas></div>
+            </div>
+            <div class="card">
+                <div class="card-title">打卡热力图</div>
+                <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:5px;">
+                    <div v-for="i in 35" :key="i" :style="{height:'30px', borderRadius:'6px', background: [3,8,15,22].includes(i) ? '#f3f4f6' : '#10b981', opacity: [3,8,15,22].includes(i) ? 1 : Math.random() * 0.5 + 0.5}"></div>
+                </div>
+            </div>
+        </div>
+
+        <van-tabbar v-model="pTab" active-color="#10b981">
+            <van-tabbar-item name="record" icon="records">健康日志</van-tabbar-item>
+            <van-tabbar-item name="square" icon="friends-o">互动广场</van-tabbar-item>
+            <van-tabbar-item name="game" icon="award-o">激励中心</van-tabbar-item>
+            <van-tabbar-item name="dashboard" icon="chart-trending-o">数据看板</van-tabbar-item>
+        </van-tabbar>
+    </div>
+
+    <div v-if="isLoggedIn && role === 'doctor'">
+        <div v-show="dTab === 'feed'">
+            <div class="card">
+                <div class="card-title" style="justify-content: space-between;">
+                    <span><van-icon name="comment-circle-o" style="color:var(--d-color);" /> 广场动态巡查</span>
+                    <van-button size="mini" type="primary" color="#0284c7" plain>一键批量点赞</van-button>
+                </div>
+                <div v-for="(post, idx) in feed" :key="idx" class="post">
+                    <div style="font-weight:bold; font-size:14px; margin-bottom:5px;">{{ post.name }} <span style="font-size:12px; color:#999; font-weight:normal;">(建档号: #892{{idx}})</span></div>
+                    <div style="font-size:13px; color:#666; margin-bottom:10px;">{{ post.content }}</div>
+                    
+                    <div style="background:#f9fafb; padding:10px; border-radius:8px; display:flex; gap:10px; flex-wrap:wrap;">
+                        <van-button size="small" type="primary" color="#0284c7" icon="good-job-o">快捷点赞</van-button>
+                        <van-button size="small" type="success" plain icon="gem-o">加精置顶</van-button>
+                        <van-button size="small" color="#f59e0b" plain icon="gift-o">发50分奖励</van-button>
+                        <van-button size="small" plain style="width:100%;">撰写权威点评回复...</van-button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-show="dTab === 'patients'">
+            <div class="card" style="background:#fef2f2; border:1px solid #fee2e2;">
+                <div class="card-title" style="color:#ef4444;"><van-icon name="warning-o" /> 重点预警跟进</div>
+                <div style="font-size:13px; line-height:1.6;">
+                    <div><strong style="font-size:14px;">真实姓名：李梦华</strong> <span style="color:#999;">(昵称: 深夜逃兵)</span></div>
+                    <div style="margin:5px 0;">该患者今日触发了您设置的违禁敏感词：</div>
+                    <div><span style="background:#ef4444; color:white; padding:2px 6px; border-radius:4px; font-size:12px;">【减肥药】</span></div>
+                </div>
+                <div style="margin-top:10px; text-align:right;">
+                    <van-button size="small" color="#0284c7" plain @click="showPatientProfile = true" style="margin-right:10px;">查阅档案</van-button>
+                    <van-button size="small" type="danger" plain>发送警告</van-button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title"><van-icon name="contact" style="color:var(--d-color);"/> 我负责的患者 (42人)</div>
+                <van-search placeholder="搜索患者真名 / 手机号" background="transparent" style="padding:0; margin-bottom:10px;" />
+                <div v-for="i in 5" :key="i" style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #eee;">
+                    <div>
+                        <div style="font-weight:bold; font-size:15px;">王建国 {{ i }}号 <span class="badge-dr">依从性高</span></div>
+                        <div style="font-size:12px; color:#666; margin-top:4px;">昵称：自律的胖虎 | 减重：-5.2kg</div>
+                    </div>
+                    <van-button size="small" plain color="#0284c7" @click="showPatientProfile = true">查阅档案</van-button>
+                </div>
+            </div>
+        </div>
+
+        <van-tabbar v-model="dTab" active-color="#0284c7">
+            <van-tabbar-item name="feed" icon="chat-o">广场巡查</van-tabbar-item>
+            <van-tabbar-item name="patients" icon="contact">预警与档案</van-tabbar-item>
+        </van-tabbar>
+    </div>
+
+    <div v-if="isLoggedIn && role === 'admin'" style="padding: 12px;">
+        <div style="display:flex; gap:10px; margin-bottom:15px;">
+            <div class="stat-block" style="background:#eef2ff;">
+                <div style="font-size:12px; color:#666;">平台入驻患者</div>
+                <div style="font-size:24px; font-weight:bold; color:var(--a-color);">12,408</div>
+            </div>
+            <div class="stat-block" style="background:#f0fdf4;">
+                <div style="font-size:12px; color:#666;">产生打卡流水</div>
+                <div style="font-size:24px; font-weight:bold; color:#16a34a;">345k+</div>
+            </div>
+        </div>
+        
+        <van-button block type="primary" color="#6366f1" icon="down" style="margin-bottom:15px; box-shadow: 0 4px 10px rgba(99,102,241,0.2);">一键导出全量打卡明细 (Excel报表)</van-button>
+
+        <div class="card" style="margin:0; padding-bottom: 20px;">
+            <div class="card-title"><van-icon name="setting-o" style="color:var(--a-color);" /> 自动化规则引擎配置</div>
+            
+            <div class="admin-section-title">1. 平台积分体系设置</div>
+            <van-cell-group inset style="margin:0; border:1px solid #eee;">
+                <van-field label="基础打卡得分" type="digit" input-align="right" model-value="10" />
+                <van-field label="传图额外得分" type="digit" input-align="right" model-value="5" />
+                <van-field label="每日得分上限" type="digit" input-align="right" model-value="50" placeholder="超限不再发分" />
+            </van-cell-group>
+            
+            <div class="admin-section-title">2. 排行榜展示逻辑与清零周期</div>
+            <van-cell-group inset style="margin:0; border:1px solid #eee;">
+                <van-cell center title="开启定期清零保护新用户">
+                    <template #right-icon><van-switch size="20px" model-value="true" active-color="#6366f1" /></template>
+                </van-cell>
+                <van-field label="自动清零周期" input-align="right" model-value="每 3 个月" is-link readonly />
+            </van-cell-group>
+
+            <div class="admin-section-title">3. 互动限制与风控封禁机制</div>
+            <van-cell-group inset style="margin:0; border:1px solid #eee;">
+                <van-field label="每日发帖上限" type="digit" input-align="right" model-value="3" placeholder="次/天" />
+                <van-cell title="违禁/敏感词库配置" is-link value="去设置" @click="showSensitiveWords = true" />
+                <van-cell center title="触发违禁词自动禁言">
+                    <template #right-icon><van-switch size="20px" model-value="true" active-color="#6366f1" /></template>
+                </van-cell>
+                <van-cell center title="严重违规自动永久封禁">
+                    <template #right-icon><van-switch size="20px" model-value="true" active-color="#ef4444" /></template>
+                </van-cell>
+            </van-cell-group>
+        </div>
+        
+        <van-tabbar :model-value="'admin'" active-color="#6366f1">
+            <van-tabbar-item name="admin" icon="setting-o">平台风控与总控面板</van-tabbar-item>
+        </van-tabbar>
+    </div>
+
+    <van-action-sheet v-model:show="showRolePicker" :actions="roleOptions" cancel-text="取消" @select="changeRole" />
+    
+    <van-action-sheet v-model:show="showPointsHistory" title="近期积分流水明细">
+        <div style="padding: 10px 16px 30px;">
+            <van-cell-group>
+                <van-cell title="每日基础健康打卡" label="今日 09:30" value="+10" value-class="text-green" />
+                <van-cell title="上传饮食/运动照片" label="今日 09:31" value="+5" value-class="text-green" />
+                <van-cell title="获得医生手动奖励" label="昨日 16:45" value="+50" value-class="text-green" />
+                <van-cell title="动态被设置为 [加精置顶]" label="04-15 11:20" value="+100" value-class="text-green" />
+            </van-cell-group>
+        </div>
+    </van-action-sheet>
+
+    <van-popup v-model:show="showPatientProfile" position="bottom" :style="{ height: '85%' }" round closeable>
+        <div style="padding: 20px; padding-top: 50px;">
+            <div style="display:flex; align-items:center; gap:15px; margin-bottom:20px;">
+                <div style="width:60px; height:60px; background:#e0f2fe; border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:24px; color:#0284c7; font-weight:bold;">王</div>
+                <div>
+                    <div style="font-size:20px; font-weight:bold;">王建国 <span style="font-size:12px; color:#999; font-weight:normal;">(男, 35岁)</span></div>
+                    <div style="font-size:13px; color:#666; margin-top:5px;">社区昵称：自律的胖虎 | 手机：138****8888</div>
+                </div>
+            </div>
+            <div style="background:#f9fafb; padding:15px; border-radius:12px; display:flex; justify-content:space-between; text-align:center; margin-bottom:20px;">
+                <div><div style="font-size:12px; color:#999;">初始体重</div><div style="font-weight:bold; font-size:18px;">85.0 kg</div></div>
+                <div><div style="font-size:12px; color:#999;">当前体重</div><div style="font-weight:bold; font-size:18px; color:#10b981;">79.8 kg</div></div>
+                <div><div style="font-size:12px; color:#999;">已打卡</div><div style="font-weight:bold; font-size:18px;">42 天</div></div>
+            </div>
+            
+            <h4 style="margin: 0 0 10px 0; color:#333;">健康风险评估雷达</h4>
+            <div style="background:#fff1f0; padding:12px; border-radius:8px; font-size:13px; color:#d9363e; border:1px solid #ffa39e; margin-bottom:20px;">
+                <van-icon name="warning" /> 提示：该患者近期【体重停滞】，且【触发敏感词】，请及时发送指导建议。
+            </div>
+
+            <h4 style="margin: 0 0 10px 0; color:#333;">详细打卡历史</h4>
+            <van-steps direction="vertical" active="0" active-color="#0284c7">
+                <van-step>
+                    <h5 style="margin:0;">今日 09:30</h5>
+                    <p style="margin:5px 0 0; color:#666; font-size:12px;">体重 79.8kg | 饮食：一般 | 运动：无</p>
+                </van-step>
+                <van-step>
+                    <h5 style="margin:0;">昨日 08:15</h5>
+                    <p style="margin:5px 0 0; color:#666; font-size:12px;">体重 80.1kg | 饮食：优秀 | 运动：力量训练 40分钟</p>
+                </van-step>
+                <van-step>
+                    <h5 style="margin:0;">前天 09:00</h5>
+                    <p style="margin:5px 0 0; color:#666; font-size:12px;">体重 80.5kg | 饮食：放纵 | 运动：无</p>
+                </van-step>
+            </van-steps>
+        </div>
+    </van-popup>
+
+    <van-popup v-model:show="showSensitiveWords" position="bottom" :style="{ height: '60%' }" round closeable>
+        <div style="padding: 20px; padding-top: 50px;">
+            <h3 style="margin-top:0;">广场违禁/敏感词库</h3>
+            <p style="font-size:12px; color:#666; margin-bottom:20px;">患者在广场发布包含以下词汇的内容时，将被系统拦截禁言，并推送给主管医生预警。</p>
+            <div style="margin-bottom: 20px;">
+                <div v-for="(word, index) in sensitiveWords" :key="index" class="word-tag">
+                    {{ word }} <van-icon name="cross" style="margin-left:5px; cursor:pointer;" @click="removeWord(index)" />
+                </div>
+            </div>
+            <van-cell-group inset style="margin:0; border:1px solid #ddd;">
+                <van-field v-model="newWord" center clearable placeholder="输入要封禁的新词汇">
+                    <template #button>
+                        <van-button size="small" type="primary" color="#6366f1" @click="addWord">添加拦截</van-button>
+                    </template>
+                </van-field>
+            </van-cell-group>
+        </div>
+    </van-popup>
+
+</div>
+
+<script>
+const { createApp, ref, watch, nextTick } = Vue;
+
+createApp({
+    setup() {
+        const isLoggedIn = ref(false);
+        const loginStep = ref(1);
+        const role = ref('patient');
+        
+        // 弹窗控制
+        const showRolePicker = ref(false);
+        const showPointsHistory = ref(false);
+        const showPatientProfile = ref(false);
+        const showSensitiveWords = ref(false);
+        
+        // 表单与文件
+        const dietFiles = ref([]);
+        const sportFiles = ref([]);
+        // 优化1：合并为一个围度开关变量
+        const showBodyMetrics = ref(false);
+        
+        const form = ref({ water: 1500, sleep: 7.5 });
+        const loginForm = ref({ phone: '', sms: '', realName: '', nickname: '', height: '', weight: '' });
+        
+        // 敏感词
+        const sensitiveWords = ref(['减肥药', '代餐', '放弃', '太饿了', '微商加我']);
+        const newWord = ref('');
+        const addWord = () => { if(newWord.value) { sensitiveWords.value.push(newWord.value); newWord.value = ''; } };
+        const removeWord = (index) => { sensitiveWords.value.splice(index, 1); };
+
+        const doLogin = () => {
+            isLoggedIn.value = true;
+            nextTick(() => { if(pTab.value === 'dashboard') renderChart(); });
+        };
+        
+        const roles = {
+            patient: { title: '演示：1. 患者端 (前端闭环)', color: '#10b981' },
+            doctor: { title: '演示：2. 医生端 (运营中心)', color: '#0284c7' },
+            admin: { title: '演示：3. 平台总控后台 (数据与规则)', color: '#6366f1' }
+        };
+        const roleOptions = [
+            { name: '切换至：患者端 (前端记录与互动)', value: 'patient' },
+            { name: '切换至：医生端 (医患运营与预警)', value: 'doctor' },
+            { name: '切换至：管理端 (数据导出与规则)', value: 'admin' }
+        ];
+
+        const pTab = ref('record');
+        const dTab = ref('feed');
+        const rankTab = ref(0);
+
+        const feed = [
+            { name: '努力变瘦的小猫', time: '10分钟前', sport: 45, content: '今天也是严格执行医生食谱的一天！腰围小了2cm。', isPinned: true, likes: 124, drName: '徐', drReply: '非常好！腰围的缩小说明内脏脂肪在减少，继续保持。' },
+            { name: '深夜食堂逃兵', time: '半小时前', sport: 60, content: '中午没忍住吃了一块蛋糕，晚上去跑了10公里赎罪。', isPinned: false, likes: 45, drName: null, drReply: null },
+            { name: '张阿姨要健康', time: '2小时前', sport: 30, content: '刚做完复查，各项指标都正常了！感谢大家鼓励。', isPinned: false, likes: 312, drName: '王', drReply: '恭喜张阿姨！进入体重维持期也要坚持健康作息。' }
+        ];
+
+        const rankList = [
+            { name: '自律给我自由', days: 142, percent: 15.2, pts: 12500 },
+            { name: '燃烧吧脂肪', days: 128, percent: 14.8, pts: 11200 },
+            { name: '减脂不反弹', days: 115, percent: 12.5, pts: 9800 }
+        ];
+
+        let myChart = null;
+        const renderChart = () => {
+            const ctx = document.getElementById('healthChart');
+            if (!ctx) return;
+            if (myChart) myChart.destroy();
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['1号', '5号', '10号', '15号', '20号', '25号', '今日'],
+                    datasets: [
+                        { label: '体重(kg)', data: [75, 74.2, 73.5, 73.0, 72.1, 71.5, 70.8], borderColor: '#10b981', tension: 0.4 },
+                        { label: '腰围(cm)', data: [88, 87.5, 87, 86, 85.5, 84, 83], borderColor: '#f59e0b', borderDash: [5, 5], tension: 0.4 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false } } } }
+            });
+        };
+
+        const changeRole = (item) => {
+            role.value = item.value;
+            showRolePicker.value = false;
+        };
+
+        watch([role, pTab], () => {
+            if (isLoggedIn.value && role.value === 'patient' && pTab.value === 'dashboard') {
+                nextTick(renderChart);
+            }
+        });
+
+        return {
+            isLoggedIn, loginStep, doLogin, loginForm,
+            role, roles, showRolePicker, roleOptions, changeRole,
+            pTab, dTab, rankTab, dietFiles, sportFiles, form,
+            showBodyMetrics, // 合并后的围度变量
+            showPointsHistory, showPatientProfile, showSensitiveWords,
+            sensitiveWords, newWord, addWord, removeWord,
+            feed, rankList
+        };
+    }
+}).use(vant).mount('#app');
+</script>
+</body>
+</html>
