@@ -64,14 +64,16 @@
         <div v-if="loginStep === 1">
             <van-cell-group inset>
                 <van-field v-model="loginForm.phone" type="tel" label="手机号" placeholder="请输入手机号" />
-                <van-field v-model="loginForm.sms" center clearable label="验证码" placeholder="请输入短信验证码">
-                    <template #button>
-                        <van-button size="small" type="primary" color="#10b981" plain>获取验证码</van-button>
+                <van-field label="短信验证" center>
+                    <template #input>
+                        <van-button size="small" type="primary" color="#10b981" plain :disabled="smsCountdown > 0" @click="sendSmsCode">{{ smsCountdown > 0 ? smsCountdown + 's后重试' : '发送验证码' }}</van-button>
                     </template>
                 </van-field>
+                <van-field v-if="smsSent" v-model="loginForm.sms" clearable label="验证码" placeholder="请输入短信验证码" />
             </van-cell-group>
+            <div style="padding: 10px 20px 0; font-size: 12px; color: #999;" v-if="!smsSent">请先点击【发送验证码】后再输入验证码</div>
             <div style="padding: 30px 20px;">
-                <van-button block round type="primary" color="#10b981" @click="loginStep = 2">登录 / 注册</van-button>
+                <van-button block round type="primary" color="#10b981" :disabled="!smsSent" @click="goProfileStep">登录 / 注册</van-button>
                 <div style="text-align: center; margin-top: 15px; font-size: 12px; color: #999;">理论后续不清缓存无需再次输入密码</div>
             </div>
         </div>
@@ -114,8 +116,8 @@
             <div class="card">
                 <div class="card-title"><van-icon name="user-o" /> 身体指标录入</div>
                 <div class="input-group">
-                    <van-field label="今日体重" placeholder="必填 (kg)" type="number" input-align="right" />
-                    <van-field label="体脂率" placeholder="可选 (%)" type="number" input-align="right" />
+                    <van-field v-model="checkinForm.weight" label="今日体重" placeholder="必填 (kg)" type="number" input-align="right" />
+                    <van-field v-model="checkinForm.bodyFat" label="体脂率" placeholder="可选 (%)" type="number" input-align="right" />
                 </div>
                 
                 <div style="margin: 10px 0; padding: 0 5px;">
@@ -123,8 +125,8 @@
                 </div>
                 
                 <div class="input-group" v-if="showBodyMetrics">
-                    <van-field label="腰围" placeholder="输入腰围 (cm)" type="number" input-align="right" />
-                    <van-field label="臀围" placeholder="输入臀围 (cm)" type="number" input-align="right" />
+                    <van-field v-model="checkinForm.waist" label="腰围" placeholder="输入腰围 (cm)" type="number" input-align="right" />
+                    <van-field v-model="checkinForm.hip" label="臀围" placeholder="输入臀围 (cm)" type="number" input-align="right" />
                 </div>
             </div>
 
@@ -139,7 +141,7 @@
 
                 <van-field label="饮食达标度" is-link arrow-direction="down" style="padding-left:0; background:transparent;">
                     <template #input>
-                        <van-radio-group direction="horizontal" style="font-size: 12px;">
+                        <van-radio-group v-model="checkinForm.dietLevel" direction="horizontal" style="font-size: 12px;">
                             <van-radio name="1" checked-color="#10b981">优秀</van-radio>
                             <van-radio name="2" checked-color="#f59e0b">一般</van-radio>
                             <van-radio name="3" checked-color="#ef4444">放纵</van-radio>
@@ -160,14 +162,14 @@
                     <van-uploader v-model="sportFiles" multiple max-count="2" upload-text="传运动图" />
                 </div>
 
-                <van-field label="运动时长" placeholder="分钟" type="digit" input-align="right" style="padding-left:0; background:transparent;"/>
+                <van-field v-model="checkinForm.sportMinutes" label="运动时长" placeholder="分钟" type="digit" input-align="right" style="padding-left:0; background:transparent;"/>
                 <div style="padding: 0 0 10px;">
                     <div style="font-size: 12px; color: #666; margin-bottom: 8px;">选择运动标签</div>
-                    <van-checkbox-group direction="horizontal" style="gap: 8px;">
-                        <van-checkbox name="a" shape="square" icon-size="14px">力量训练</van-checkbox>
-                        <van-checkbox name="b" shape="square" icon-size="14px">有氧跑步</van-checkbox>
-                        <van-checkbox name="c" shape="square" icon-size="14px">散步</van-checkbox>
-                        <van-checkbox name="d" shape="square" icon-size="14px">动感单车</van-checkbox>
+                    <van-checkbox-group v-model="checkinForm.sportTags" direction="horizontal" style="gap: 8px;">
+                        <van-checkbox name="力量训练" shape="square" icon-size="14px">力量训练</van-checkbox>
+                        <van-checkbox name="有氧跑步" shape="square" icon-size="14px">有氧跑步</van-checkbox>
+                        <van-checkbox name="散步" shape="square" icon-size="14px">散步</van-checkbox>
+                        <van-checkbox name="动感单车" shape="square" icon-size="14px">动感单车</van-checkbox>
                     </van-checkbox-group>
                 </div>
             </div>
@@ -182,18 +184,18 @@
                 </van-field>
                 <van-field label="排便情况" is-link arrow-direction="down">
                     <template #input>
-                        <van-radio-group direction="horizontal" style="font-size: 12px;">
+                        <van-radio-group v-model="checkinForm.stool" direction="horizontal" style="font-size: 12px;">
                             <van-radio name="a" checked-color="#10b981">顺畅</van-radio>
                             <van-radio name="b" checked-color="#f59e0b">困难</van-radio>
                             <van-radio name="c" checked-color="#ef4444">无</van-radio>
                         </van-radio-group>
                     </template>
                 </van-field>
-                <van-field type="textarea" rows="2" autosize placeholder="记录今天的减重感悟或碎碎念..." style="background:#f9fafb; border-radius:8px; margin-top:10px;" />
+                <van-field v-model="checkinForm.desc" type="textarea" rows="2" autosize placeholder="记录今天的减重感悟或碎碎念..." style="background:#f9fafb; border-radius:8px; margin-top:10px;" />
             </div>
             
             <div style="padding: 0 12px 20px;">
-                <van-button block round color="#10b981" style="box-shadow: 0 4px 15px rgba(16,185,129,0.3);">提交完整健康日志</van-button>
+                <van-button block round color="#10b981" style="box-shadow: 0 4px 15px rgba(16,185,129,0.3);" @click="submitCheckin">提交完整健康日志</van-button>
             </div>
         </div>
 
@@ -225,8 +227,8 @@
                         {{ post.drReply }}
                     </div>
                     <div class="action-bar">
-                        <span><van-icon name="good-job-o" /> {{ post.likes }} 赞</span>
-                        <span><van-icon name="chat-o" /> 评论</span>
+                        <span style="cursor:pointer;" @click="toggleLike(idx)"><van-icon :name="post.liked ? 'good-job' : 'good-job-o'" /> {{ post.likes }} 赞</span>
+                        <span style="cursor:pointer;" @click="openCommentDialog(idx)"><van-icon name="chat-o" /> 评论 {{ post.comments?.length || 0 }}</span>
                     </div>
                 </div>
             </div>
@@ -235,10 +237,10 @@
         <div v-show="pTab === 'game'">
             <div class="card" style="background: linear-gradient(135deg, #10b981, #059669); color: white; text-align: center;">
                 <div style="font-size: 14px; opacity: 0.9;">我的可用积分</div>
-                <div style="font-size: 40px; font-weight: bold; margin: 10px 0;">3,850</div>
+                <div style="font-size: 40px; font-weight: bold; margin: 10px 0;">{{ points }}</div>
                 <div style="display:flex; justify-content:center; gap:20px; font-size:12px; opacity:0.8;">
-                    <span>累计打卡: 42天</span>
-                    <span>今日排行: 第5名</span>
+                    <span>累计打卡: {{ checkinDays }}天</span>
+                    <span>今日排行: 第{{ todayRank }}名</span>
                 </div>
                 <div style="margin-top:15px; font-size:13px;">
                     <span @click="showPointsHistory = true" style="background:rgba(255,255,255,0.2); padding:5px 15px; border-radius:20px; cursor:pointer;">查看积分明细流水 ></span>
@@ -296,16 +298,16 @@
             <div class="card">
                 <div class="card-title" style="justify-content: space-between;">
                     <span><van-icon name="comment-circle-o" style="color:var(--d-color);" /> 广场动态巡查</span>
-                    <van-button size="mini" type="primary" color="#0284c7" plain>一键批量点赞</van-button>
+                    <van-button size="mini" type="primary" color="#0284c7" plain @click="batchLike">一键批量点赞</van-button>
                 </div>
                 <div v-for="(post, idx) in feed" :key="idx" class="post">
                     <div style="font-weight:bold; font-size:14px; margin-bottom:5px;">{{ post.name }} <span style="font-size:12px; color:#999; font-weight:normal;">(建档号: #892{{idx}})</span></div>
                     <div style="font-size:13px; color:#666; margin-bottom:10px;">{{ post.content }}</div>
                     
                     <div style="background:#f9fafb; padding:10px; border-radius:8px; display:flex; gap:10px; flex-wrap:wrap;">
-                        <van-button size="small" type="primary" color="#0284c7" icon="good-job-o">快捷点赞</van-button>
-                        <van-button size="small" type="success" plain icon="gem-o">加精置顶</van-button>
-                        <van-button size="small" color="#f59e0b" plain icon="gift-o">发50分奖励</van-button>
+                        <van-button size="small" type="primary" color="#0284c7" icon="good-job-o" @click="doctorLike(idx)">快捷点赞</van-button>
+                        <van-button size="small" type="success" plain icon="gem-o" @click="togglePinned(idx)">加精置顶</van-button>
+                        <van-button size="small" color="#f59e0b" plain icon="gift-o" @click="rewardPatient(post)">发50分奖励</van-button>
                         <van-button size="small" plain style="width:100%;">撰写权威点评回复...</van-button>
                     </div>
                 </div>
@@ -357,16 +359,16 @@
             </div>
         </div>
         
-        <van-button block type="primary" color="#6366f1" icon="down" style="margin-bottom:15px; box-shadow: 0 4px 10px rgba(99,102,241,0.2);">一键导出全量打卡明细 (Excel报表)</van-button>
+        <van-button block type="primary" color="#6366f1" icon="down" style="margin-bottom:15px; box-shadow: 0 4px 10px rgba(99,102,241,0.2);" @click="exportCheckins">一键导出全量打卡明细 (Excel报表)</van-button>
 
         <div class="card" style="margin:0; padding-bottom: 20px;">
             <div class="card-title"><van-icon name="setting-o" style="color:var(--a-color);" /> 自动化规则引擎配置</div>
             
             <div class="admin-section-title">1. 平台积分体系设置</div>
             <van-cell-group inset style="margin:0; border:1px solid #eee;">
-                <van-field label="基础打卡得分" type="digit" input-align="right" model-value="10" />
-                <van-field label="传图额外得分" type="digit" input-align="right" model-value="5" />
-                <van-field label="每日得分上限" type="digit" input-align="right" model-value="50" placeholder="超限不再发分" />
+                <van-field v-model="adminSettings.baseScore" label="基础打卡得分" type="digit" input-align="right" />
+                <van-field v-model="adminSettings.imageBonus" label="传图额外得分" type="digit" input-align="right" />
+                <van-field v-model="adminSettings.dailyCap" label="每日得分上限" type="digit" input-align="right" placeholder="超限不再发分" />
             </van-cell-group>
             
             <div class="admin-section-title">2. 排行榜展示逻辑与清零周期</div>
@@ -388,6 +390,9 @@
                     <template #right-icon><van-switch size="20px" model-value="true" active-color="#ef4444" /></template>
                 </van-cell>
             </van-cell-group>
+        </div>
+        <div style="margin-top: 12px;">
+            <van-button block type="primary" color="#6366f1" @click="saveAdminSettings">保存规则配置</van-button>
         </div>
         
         <van-tabbar :model-value="'admin'" active-color="#6366f1">
@@ -465,6 +470,13 @@
         </div>
     </van-popup>
 
+
+    <van-dialog v-model:show="showCommentDialog" title="发布评论" show-cancel-button @confirm="submitComment">
+        <div style="padding: 10px 16px 20px;">
+            <van-field v-model="commentText" type="textarea" rows="3" autosize placeholder="说点鼓励的话吧..." />
+        </div>
+    </van-dialog>
+
 </div>
 
 <script>
@@ -472,36 +484,105 @@ const { createApp, ref, watch, nextTick } = Vue;
 
 createApp({
     setup() {
+        const { showToast } = vant;
         const isLoggedIn = ref(false);
         const loginStep = ref(1);
         const role = ref('patient');
-        
-        // 弹窗控制
+        const smsCountdown = ref(0);
+        const smsSent = ref(false);
+
         const showRolePicker = ref(false);
         const showPointsHistory = ref(false);
         const showPatientProfile = ref(false);
         const showSensitiveWords = ref(false);
-        
-        // 表单与文件
+        const showCommentDialog = ref(false);
+
         const dietFiles = ref([]);
         const sportFiles = ref([]);
-        // 优化1：合并为一个围度开关变量
         const showBodyMetrics = ref(false);
-        
-        const form = ref({ water: 1500, sleep: 7.5 });
+
         const loginForm = ref({ phone: '', sms: '', realName: '', nickname: '', height: '', weight: '' });
-        
-        // 敏感词
+        const form = ref({ water: 1500, sleep: 7.5 });
+        const checkinForm = ref({
+            weight: '',
+            bodyFat: '',
+            waist: '',
+            hip: '',
+            dietLevel: '1',
+            sportMinutes: '',
+            sportTags: [],
+            stool: 'a',
+            desc: ''
+        });
+
+        const points = ref(3850);
+        const checkinDays = ref(42);
+        const todayRank = ref(5);
+
+        const adminSettings = ref({ baseScore: '10', imageBonus: '5', dailyCap: '50' });
+
         const sensitiveWords = ref(['减肥药', '代餐', '放弃', '太饿了', '微商加我']);
         const newWord = ref('');
-        const addWord = () => { if(newWord.value) { sensitiveWords.value.push(newWord.value); newWord.value = ''; } };
-        const removeWord = (index) => { sensitiveWords.value.splice(index, 1); };
+        const addWord = () => {
+            if (!newWord.value.trim()) return;
+            if (!sensitiveWords.value.includes(newWord.value.trim())) sensitiveWords.value.push(newWord.value.trim());
+            newWord.value = '';
+            showToast('敏感词已加入词库');
+        };
+        const removeWord = (index) => {
+            sensitiveWords.value.splice(index, 1);
+            showToast('已移除');
+        };
+
+        const containsSensitiveWord = (text = '') => {
+            return sensitiveWords.value.find((word) => text.includes(word));
+        };
+
+        let timer = null;
+        const sendSmsCode = () => {
+            if (!/^1\d{10}$/.test(loginForm.value.phone)) {
+                showToast('请输入正确的11位手机号');
+                return;
+            }
+            smsSent.value = true;
+            loginForm.value.sms = '';
+            smsCountdown.value = 60;
+            timer = setInterval(() => {
+                smsCountdown.value -= 1;
+                if (smsCountdown.value <= 0) clearInterval(timer);
+            }, 1000);
+            showToast('验证码为演示模式：123456');
+        };
+
+        const goProfileStep = () => {
+            if (!/^1\d{10}$/.test(loginForm.value.phone)) {
+                showToast('手机号格式有误');
+                return;
+            }
+            if (!smsSent.value) {
+                showToast('请先发送验证码');
+                return;
+            }
+            if (!loginForm.value.sms) {
+                showToast('请输入验证码');
+                return;
+            }
+            loginStep.value = 2;
+        };
 
         const doLogin = () => {
+            const { realName, nickname, height, weight } = loginForm.value;
+            if (!realName || !nickname || !height || !weight) {
+                showToast('请完善全部建档信息');
+                return;
+            }
             isLoggedIn.value = true;
-            nextTick(() => { if(pTab.value === 'dashboard') renderChart(); });
+            showToast(`欢迎你，${nickname}`);
+            nextTick(() => {
+                if (pTab.value === 'dashboard') renderChart();
+            });
         };
-        
+
         const roles = {
             patient: { title: '演示：1. 患者端 (前端闭环)', color: '#10b981' },
             doctor: { title: '演示：2. 医生端 (运营中心)', color: '#0284c7' },
@@ -517,17 +598,130 @@ createApp({
         const dTab = ref('feed');
         const rankTab = ref(0);
 
-        const feed = [
-            { name: '努力变瘦的小猫', time: '10分钟前', sport: 45, content: '今天也是严格执行医生食谱的一天！腰围小了2cm。', isPinned: true, likes: 124, drName: '徐', drReply: '非常好！腰围的缩小说明内脏脂肪在减少，继续保持。' },
-            { name: '深夜食堂逃兵', time: '半小时前', sport: 60, content: '中午没忍住吃了一块蛋糕，晚上去跑了10公里赎罪。', isPinned: false, likes: 45, drName: null, drReply: null },
-            { name: '张阿姨要健康', time: '2小时前', sport: 30, content: '刚做完复查，各项指标都正常了！感谢大家鼓励。', isPinned: false, likes: 312, drName: '王', drReply: '恭喜张阿姨！进入体重维持期也要坚持健康作息。' }
-        ];
+        const feed = ref([
+            { name: '努力变瘦的小猫', time: '10分钟前', sport: 45, content: '今天也是严格执行医生食谱的一天！腰围小了2cm。', isPinned: true, likes: 124, liked: false, comments: [], drName: '徐', drReply: '非常好！腰围的缩小说明内脏脂肪在减少，继续保持。' },
+            { name: '深夜食堂逃兵', time: '半小时前', sport: 60, content: '中午没忍住吃了一块蛋糕，晚上去跑了10公里赎罪。', isPinned: false, likes: 45, liked: false, comments: [], drName: null, drReply: null },
+            { name: '张阿姨要健康', time: '2小时前', sport: 30, content: '刚做完复查，各项指标都正常了！感谢大家鼓励。', isPinned: false, likes: 312, liked: false, comments: [], drName: '王', drReply: '恭喜张阿姨！进入体重维持期也要坚持健康作息。' }
+        ]);
 
-        const rankList = [
+        const rankList = ref([
             { name: '自律给我自由', days: 142, percent: 15.2, pts: 12500 },
             { name: '燃烧吧脂肪', days: 128, percent: 14.8, pts: 11200 },
             { name: '减脂不反弹', days: 115, percent: 12.5, pts: 9800 }
-        ];
+        ]);
+
+        const resetCheckinForm = () => {
+            checkinForm.value = { weight: '', bodyFat: '', waist: '', hip: '', dietLevel: '1', sportMinutes: '', sportTags: [], stool: 'a', desc: '' };
+            dietFiles.value = [];
+            sportFiles.value = [];
+            showBodyMetrics.value = false;
+            form.value = { water: 1500, sleep: 7.5 };
+        };
+
+        const submitCheckin = () => {
+            if (!checkinForm.value.weight) {
+                showToast('请先填写今日体重');
+                return;
+            }
+            const badWord = containsSensitiveWord(checkinForm.value.desc);
+            if (badWord) {
+                showToast(`动态包含敏感词：${badWord}`);
+                return;
+            }
+            const baseScore = Number(adminSettings.value.baseScore) || 10;
+            const imageBonus = Number(adminSettings.value.imageBonus) || 5;
+            const dailyCap = Number(adminSettings.value.dailyCap) || 50;
+            const imageScore = (dietFiles.value.length + sportFiles.value.length > 0) ? imageBonus : 0;
+            const earn = Math.min(baseScore + imageScore, dailyCap);
+            points.value += earn;
+            checkinDays.value += 1;
+
+            const newPost = {
+                name: loginForm.value.nickname || '新用户',
+                time: '刚刚',
+                sport: Number(checkinForm.value.sportMinutes) || 0,
+                content: checkinForm.value.desc || '完成今日健康打卡，继续保持！',
+                isPinned: false,
+                likes: 0,
+                liked: false,
+                comments: [],
+                drName: null,
+                drReply: null
+            };
+            feed.value.unshift(newPost);
+            showToast(`打卡成功，积分 +${earn}`);
+            pTab.value = 'square';
+            resetCheckinForm();
+        };
+
+        const toggleLike = (idx) => {
+            const post = feed.value[idx];
+            post.liked = !post.liked;
+            post.likes += post.liked ? 1 : -1;
+        };
+
+        const currentCommentPost = ref(-1);
+        const commentText = ref('');
+        const openCommentDialog = (idx) => {
+            currentCommentPost.value = idx;
+            commentText.value = '';
+            showCommentDialog.value = true;
+        };
+        const submitComment = () => {
+            if (currentCommentPost.value < 0) return;
+            const text = commentText.value.trim();
+            if (!text) {
+                showToast('评论不能为空');
+                return;
+            }
+            const badWord = containsSensitiveWord(text);
+            if (badWord) {
+                showToast(`评论包含敏感词：${badWord}`);
+                return;
+            }
+            feed.value[currentCommentPost.value].comments.push({ text, by: loginForm.value.nickname || '匿名用户' });
+            showToast('评论发布成功');
+        };
+
+        const doctorLike = (idx) => {
+            feed.value[idx].likes += 1;
+            showToast('已代表医生点赞');
+        };
+        const togglePinned = (idx) => {
+            feed.value[idx].isPinned = !feed.value[idx].isPinned;
+            showToast(feed.value[idx].isPinned ? '已加精置顶' : '已取消置顶');
+        };
+        const rewardPatient = () => {
+            showToast('奖励已发放：+50分');
+        };
+        const batchLike = () => {
+            feed.value.forEach((post) => { post.likes += 1; });
+            showToast('批量点赞成功');
+        };
+
+        const saveAdminSettings = () => {
+            localStorage.setItem('adminSettings', JSON.stringify(adminSettings.value));
+            showToast('规则已保存');
+        };
+
+        const exportCheckins = () => {
+            const rows = [['昵称', '时间', '运动分钟', '文案', '点赞数']];
+            feed.value.forEach((post) => rows.push([post.name, post.time, post.sport, post.content, post.likes]));
+            const csv = rows.map((row) => row.map((i) => `"${String(i).replaceAll('"', '""')}"`).join(',')).join('\n');
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `checkin-export-${Date.now()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('导出成功（CSV可直接用Excel打开）');
+        };
+
+        const changeRole = (item) => {
+            role.value = item.value;
+            showRolePicker.value = false;
+        };
 
         let myChart = null;
         const renderChart = () => {
@@ -547,25 +741,30 @@ createApp({
             });
         };
 
-        const changeRole = (item) => {
-            role.value = item.value;
-            showRolePicker.value = false;
-        };
-
         watch([role, pTab], () => {
-            if (isLoggedIn.value && role.value === 'patient' && pTab.value === 'dashboard') {
-                nextTick(renderChart);
-            }
+            if (isLoggedIn.value && role.value === 'patient' && pTab.value === 'dashboard') nextTick(renderChart);
         });
 
+        try {
+            const cached = localStorage.getItem('adminSettings');
+            if (cached) adminSettings.value = JSON.parse(cached);
+        } catch (e) {
+            console.warn('读取本地设置失败', e);
+        }
+
         return {
-            isLoggedIn, loginStep, doLogin, loginForm,
+            isLoggedIn, loginStep, loginForm, doLogin,
             role, roles, showRolePicker, roleOptions, changeRole,
-            pTab, dTab, rankTab, dietFiles, sportFiles, form,
-            showBodyMetrics, // 合并后的围度变量
+            pTab, dTab, rankTab,
+            dietFiles, sportFiles, form, showBodyMetrics, checkinForm, submitCheckin,
             showPointsHistory, showPatientProfile, showSensitiveWords,
             sensitiveWords, newWord, addWord, removeWord,
-            feed, rankList
+            feed, rankList, toggleLike,
+            points, checkinDays, todayRank,
+            showCommentDialog, commentText, openCommentDialog, submitComment,
+            smsCountdown, smsSent, sendSmsCode, goProfileStep,
+            doctorLike, togglePinned, rewardPatient, batchLike,
+            adminSettings, saveAdminSettings, exportCheckins
         };
     }
 }).use(vant).mount('#app');
