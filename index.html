@@ -220,6 +220,7 @@
                                 <div style="font-weight: bold; font-size: 14px;">
                                     {{ post.name }} 
                                     <span v-if="post.isPinned" class="badge-hot">置顶</span>
+                                    <span v-if="post.isFeatured" class="badge-dr" style="margin-left:4px;">加精</span>
                                 </div>
                                 <div style="font-size: 11px; color: #999;">{{ post.time }}</div>
                             </div>
@@ -318,7 +319,8 @@
                     
                     <div style="background:#f9fafb; padding:10px; border-radius:8px; display:flex; gap:10px; flex-wrap:wrap;">
                         <van-button size="small" type="primary" color="#0284c7" icon="good-job-o" @click="doctorLike(idx)">快捷点赞</van-button>
-                        <van-button size="small" type="success" plain icon="gem-o" @click="togglePinned(idx)">加精置顶</van-button>
+                        <van-button size="small" type="success" plain icon="award-o" @click="toggleFeatured(idx)">加精</van-button>
+                        <van-button size="small" plain icon="flag-o" @click="togglePinned(idx)">置顶</van-button>
                         <van-button size="small" color="#f59e0b" plain icon="gift-o" @click="rewardPatient(post)">发50分奖励</van-button>
                         <div style="width:100%; display:flex; gap:8px;">
                             <van-field v-model="doctorReplyDraft[idx]" placeholder="撰写权威点评回复..." style="flex:1; background:#fff; border-radius:8px;" />
@@ -449,6 +451,12 @@
                 <van-icon name="warning" /> 提示：该患者近期【体重停滞】，且【触发敏感词】，请及时发送指导建议。
             </div>
 
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h4 style="margin: 0; color:#333;">专属健康图表档案</h4>
+                <van-button size="small" plain type="primary" color="#0284c7" @click="exportPatientProfile">导出档案</van-button>
+            </div>
+            <div style="height:180px; margin-bottom:16px;"><canvas id="patientProfileChart"></canvas></div>
+
             <h4 style="margin: 0 0 10px 0; color:#333;">详细打卡历史</h4>
             <van-steps direction="vertical" active="0" active-color="#0284c7">
                 <van-step>
@@ -472,14 +480,27 @@
             <h3 style="margin-top:0;">广场违禁/敏感词库</h3>
             <p style="font-size:12px; color:#666; margin-bottom:20px;">患者在广场发布包含以下词汇的内容时，将被系统拦截禁言，并推送给主管医生预警。</p>
             <div style="margin-bottom: 20px;">
-                <div v-for="(word, index) in sensitiveWords" :key="index" class="word-tag">
+                <div v-for="(word, index) in sensitiveWords" :key="`s-${index}`" class="word-tag">
                     {{ word }} <van-icon name="cross" style="margin-left:5px; cursor:pointer;" @click="removeWord(index)" />
+                </div>
+            </div>
+            <div style="font-size:13px; color:#666; margin-bottom:8px; font-weight:bold;">非法词库（广告/诈骗/导流）</div>
+            <div style="margin-bottom: 20px;">
+                <div v-for="(word, index) in illegalWords" :key="`i-${index}`" class="word-tag" style="background:#fff7ed; color:#ea580c;">
+                    {{ word }} <van-icon name="cross" style="margin-left:5px; cursor:pointer;" @click="removeIllegalWord(index)" />
                 </div>
             </div>
             <van-cell-group inset style="margin:0; border:1px solid #ddd;">
                 <van-field v-model="newWord" center clearable placeholder="输入要封禁的新词汇">
                     <template #button>
                         <van-button size="small" type="primary" color="#6366f1" @click="addWord">添加拦截</van-button>
+                    </template>
+                </van-field>
+            </van-cell-group>
+            <van-cell-group inset style="margin:10px 0 0; border:1px solid #ddd;">
+                <van-field v-model="newIllegalWord" center clearable placeholder="输入非法词（如引流、返利、刷单）">
+                    <template #button>
+                        <van-button size="small" type="warning" plain @click="addIllegalWord">添加非法词</van-button>
                     </template>
                 </van-field>
             </van-cell-group>
@@ -539,7 +560,9 @@ createApp({
         const adminSettings = ref({ baseScore: '10', imageBonus: '5', dailyCap: '50', postLimit: '3', resetCycleMonths: '3', lastResetAt: new Date().toISOString() });
 
         const sensitiveWords = ref(['减肥药', '代餐', '放弃', '太饿了', '微商加我']);
+        const illegalWords = ref(['加微信', '刷单', '返利', '点击链接']);
         const newWord = ref('');
+        const newIllegalWord = ref('');
         const userRisk = ref({ violationCount: 0, muted: false });
         const doctorReplyDraft = ref({});
         const doctorAlerts = ref([]);
@@ -553,9 +576,20 @@ createApp({
             sensitiveWords.value.splice(index, 1);
             showToast('已移除');
         };
+        const addIllegalWord = () => {
+            const word = String(newIllegalWord.value || '').trim();
+            if (!word) return;
+            if (!illegalWords.value.includes(word)) illegalWords.value.push(word);
+            newIllegalWord.value = '';
+            showToast('非法词已加入词库');
+        };
+        const removeIllegalWord = (index) => {
+            illegalWords.value.splice(index, 1);
+            showToast('非法词已移除');
+        };
 
         const containsSensitiveWord = (text = '') => {
-            return sensitiveWords.value.find((word) => text.includes(word));
+            return [...sensitiveWords.value, ...illegalWords.value].find((word) => text.includes(word));
         };
 
         const markViolation = () => {
@@ -667,9 +701,9 @@ createApp({
         const rankTab = ref(0);
 
         const feed = ref([
-            { name: '努力变瘦的小猫', time: '10分钟前', sport: 45, weight: 70.8, showWeight: false, content: '今天也是严格执行医生食谱的一天！腰围小了2cm。', isPinned: true, likes: 124, liked: false, comments: [], drName: '徐', drReply: '非常好！腰围的缩小说明内脏脂肪在减少，继续保持。' },
-            { name: '深夜食堂逃兵', time: '半小时前', sport: 60, weight: 82.5, showWeight: true, content: '中午没忍住吃了一块蛋糕，晚上去跑了10公里赎罪。', isPinned: false, likes: 45, liked: false, comments: [], drName: null, drReply: null },
-            { name: '张阿姨要健康', time: '2小时前', sport: 30, weight: 65.2, showWeight: false, content: '刚做完复查，各项指标都正常了！感谢大家鼓励。', isPinned: false, likes: 312, liked: false, comments: [], drName: '王', drReply: '恭喜张阿姨！进入体重维持期也要坚持健康作息。' }
+            { name: '努力变瘦的小猫', time: '10分钟前', sport: 45, weight: 70.8, showWeight: false, content: '今天也是严格执行医生食谱的一天！腰围小了2cm。', isPinned: true, isFeatured: true, likes: 124, liked: false, comments: [], drName: '徐', drReply: '非常好！腰围的缩小说明内脏脂肪在减少，继续保持。' },
+            { name: '深夜食堂逃兵', time: '半小时前', sport: 60, weight: 82.5, showWeight: true, content: '中午没忍住吃了一块蛋糕，晚上去跑了10公里赎罪。', isPinned: false, isFeatured: false, likes: 45, liked: false, comments: [], drName: null, drReply: null },
+            { name: '张阿姨要健康', time: '2小时前', sport: 30, weight: 65.2, showWeight: false, content: '刚做完复查，各项指标都正常了！感谢大家鼓励。', isPinned: false, isFeatured: false, likes: 312, liked: false, comments: [], drName: '王', drReply: '恭喜张阿姨！进入体重维持期也要坚持健康作息。' }
         ]);
 
         const rankList = ref([
@@ -724,6 +758,7 @@ createApp({
                 showWeight: !checkinForm.value.hideWeight,
                 content: checkinForm.value.desc || '完成今日健康打卡，继续保持！',
                 isPinned: false,
+                isFeatured: false,
                 likes: 0,
                 liked: false,
                 comments: [],
@@ -788,9 +823,13 @@ createApp({
             feed.value[idx].likes += 1;
             showToast('已代表医生点赞');
         };
+        const toggleFeatured = (idx) => {
+            feed.value[idx].isFeatured = !feed.value[idx].isFeatured;
+            showToast(feed.value[idx].isFeatured ? '已设为加精' : '已取消加精');
+        };
         const togglePinned = (idx) => {
             feed.value[idx].isPinned = !feed.value[idx].isPinned;
-            showToast(feed.value[idx].isPinned ? '已加精置顶' : '已取消置顶');
+            showToast(feed.value[idx].isPinned ? '已置顶' : '已取消置顶');
         };
         const rewardPatient = () => {
             showToast('奖励已发放：+50分');
@@ -807,6 +846,50 @@ createApp({
             }
             doctorAlerts.value.shift();
             showToast('已发送预警通知');
+        };
+
+        const patientProfileData = ref({ name: '王建国', phone: '138****8888', initialWeight: 85, currentWeight: 79.8, days: 42, trend: [85,84.1,83.5,82.6,81.3,80.4,79.8] });
+
+        let patientChart = null;
+        const renderPatientProfileChart = () => {
+            const ctx = document.getElementById('patientProfileChart');
+            if (!ctx) return;
+            if (patientChart) patientChart.destroy();
+            patientChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['第1周','第2周','第3周','第4周','第5周','第6周','本周'],
+                    datasets: [{ label: '体重趋势(kg)', data: patientProfileData.value.trend, borderColor: '#0284c7', tension: 0.35 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        };
+
+        const exportPatientProfile = () => {
+            const rows = [
+                ['姓名', patientProfileData.value.name],
+                ['手机号', patientProfileData.value.phone],
+                ['初始体重', patientProfileData.value.initialWeight],
+                ['当前体重', patientProfileData.value.currentWeight],
+                ['累计打卡天数', patientProfileData.value.days]
+            ];
+            if (window.XLSX) {
+                const ws = XLSX.utils.aoa_to_sheet(rows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'patient-profile');
+                XLSX.writeFile(wb, `patient-profile-${Date.now()}.xlsx`);
+                showToast('患者档案已导出');
+                return;
+            }
+            const csv = rows.map((r) => r.join(',')).join('\n');
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `patient-profile-${Date.now()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('患者档案已导出');
         };
 
         const saveAdminSettings = () => {
@@ -873,6 +956,10 @@ createApp({
             if (isLoggedIn.value && role.value === 'patient' && pTab.value === 'dashboard') nextTick(renderChart);
         });
 
+        watch(showPatientProfile, (val) => {
+            if (val) nextTick(renderPatientProfileChart);
+        });
+
         try {
             const cached = localStorage.getItem('adminSettings');
             if (cached) adminSettings.value = { ...adminSettings.value, ...JSON.parse(cached) };
@@ -889,13 +976,13 @@ createApp({
             pTab, dTab, rankTab,
             dietFiles, sportFiles, form, showBodyMetrics, checkinForm, submitCheckin,
             showPointsHistory, showPatientProfile, showSensitiveWords,
-            sensitiveWords, newWord, addWord, removeWord,
+            sensitiveWords, illegalWords, newWord, newIllegalWord, addWord, removeWord, addIllegalWord, removeIllegalWord,
             feed, rankList, toggleLike,
             points, checkinDays, todayRank,
             showCommentDialog, commentText, openCommentDialog, submitComment,
             smsCountdown, smsSent, sendSmsCode, goProfileStep,
-            doctorLike, togglePinned, rewardPatient, batchLike, submitDoctorReply, doctorReplyDraft,
-            adminSettings, saveAdminSettings, exportCheckins, userRisk, doctorAlerts, ackAlert
+            doctorLike, toggleFeatured, togglePinned, rewardPatient, batchLike, submitDoctorReply, doctorReplyDraft,
+            adminSettings, saveAdminSettings, exportCheckins, userRisk, doctorAlerts, ackAlert, exportPatientProfile
         };
     }
 }).use(vant).mount('#app');
