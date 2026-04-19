@@ -575,13 +575,30 @@ createApp({
         };
 
         const doLogin = () => {
-            const { realName, nickname, height, weight } = loginForm.value;
-            if (!realName || !nickname || !height || !weight) {
-                showToast('请完善全部建档信息');
+            const fieldLabelMap = {
+                realName: '真实姓名',
+                nickname: '社区昵称',
+                height: '身高',
+                weight: '初始体重'
+            };
+
+            const normalized = {
+                realName: String(loginForm.value.realName || '').trim(),
+                nickname: String(loginForm.value.nickname || '').trim(),
+                height: String(loginForm.value.height || '').trim(),
+                weight: String(loginForm.value.weight || '').trim()
+            };
+
+            const missingKeys = Object.keys(normalized).filter((key) => !normalized[key]);
+            if (missingKeys.length) {
+                const missingLabels = missingKeys.map((key) => fieldLabelMap[key]).join('、');
+                showToast(`请完善：${missingLabels}`);
                 return;
             }
+
+            loginForm.value = { ...loginForm.value, ...normalized };
             isLoggedIn.value = true;
-            showToast(`欢迎你，${nickname}`);
+            showToast(`欢迎你，${normalized.nickname}`);
             nextTick(() => {
                 if (pTab.value === 'dashboard') renderChart();
             });
