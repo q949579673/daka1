@@ -199,6 +199,10 @@
                 </van-field>
                 <van-field v-model="checkinForm.desc" type="textarea" rows="2" autosize placeholder="记录今天的减重感悟或碎碎念..." style="background:#f9fafb; border-radius:8px; margin-top:10px;" />
             </div>
+
+            <div class="card" style="padding-top: 12px; padding-bottom: 12px;">
+                <van-checkbox v-model="checkinForm.hideWeight" shape="square" checked-color="#10b981">广场隐藏绝对体重（仅展示相对变化）</van-checkbox>
+            </div>
             
             <div style="padding: 0 12px 20px;">
                 <van-button block round color="#10b981" style="box-shadow: 0 4px 15px rgba(16,185,129,0.3);" @click="submitCheckin">提交完整健康日志</van-button>
@@ -222,6 +226,7 @@
                     </div>
                     <div class="tag-list">
                         <span class="tag">🏃 运动 {{ post.sport }}分钟</span>
+                        <span class="tag" style="background:#f5f3ff; color:#6d28d9;">⚖️ {{ post.showWeight ? (post.weight + "kg") : "已隐藏" }}</span>
                         <span class="tag" style="background:#e0f2fe; color:#0284c7;">💧 饮水 2000ml</span>
                         <span class="tag" style="background:#fffbeb; color:#d97706;">🥗 饮食达标</span>
                     </div>
@@ -314,7 +319,10 @@
                         <van-button size="small" type="primary" color="#0284c7" icon="good-job-o" @click="doctorLike(idx)">快捷点赞</van-button>
                         <van-button size="small" type="success" plain icon="gem-o" @click="togglePinned(idx)">加精置顶</van-button>
                         <van-button size="small" color="#f59e0b" plain icon="gift-o" @click="rewardPatient(post)">发50分奖励</van-button>
-                        <van-button size="small" plain style="width:100%;">撰写权威点评回复...</van-button>
+                        <div style="width:100%; display:flex; gap:8px;">
+                            <van-field v-model="doctorReplyDraft[idx]" placeholder="撰写权威点评回复..." style="flex:1; background:#fff; border-radius:8px;" />
+                            <van-button size="small" type="primary" color="#0284c7" @click="submitDoctorReply(idx)">回复</van-button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -387,7 +395,7 @@
 
             <div class="admin-section-title">3. 互动限制与风控封禁机制</div>
             <van-cell-group inset style="margin:0; border:1px solid #eee;">
-                <van-field label="每日发帖上限" type="digit" input-align="right" model-value="3" placeholder="次/天" />
+                <van-field v-model="adminSettings.postLimit" label="每日发帖上限" type="digit" input-align="right" placeholder="次/天" />
                 <van-cell title="违禁/敏感词库配置" is-link value="去设置" @click="showSensitiveWords = true" />
                 <van-cell center title="触发违禁词自动禁言">
                     <template #right-icon><van-switch size="20px" model-value="true" active-color="#6366f1" /></template>
@@ -518,17 +526,20 @@ createApp({
             sportMinutes: '',
             sportTags: [],
             stool: 'a',
-            desc: ''
+            desc: '',
+            hideWeight: true
         });
 
         const points = ref(3850);
         const checkinDays = ref(42);
         const todayRank = ref(5);
 
-        const adminSettings = ref({ baseScore: '10', imageBonus: '5', dailyCap: '50' });
+        const adminSettings = ref({ baseScore: '10', imageBonus: '5', dailyCap: '50', postLimit: '3' });
 
         const sensitiveWords = ref(['减肥药', '代餐', '放弃', '太饿了', '微商加我']);
         const newWord = ref('');
+        const userRisk = ref({ violationCount: 0, muted: false });
+        const doctorReplyDraft = ref({});
         const addWord = () => {
             if (!newWord.value.trim()) return;
             if (!sensitiveWords.value.includes(newWord.value.trim())) sensitiveWords.value.push(newWord.value.trim());
@@ -542,6 +553,11 @@ createApp({
 
         const containsSensitiveWord = (text = '') => {
             return sensitiveWords.value.find((word) => text.includes(word));
+        };
+
+        const markViolation = () => {
+            userRisk.value.violationCount += 1;
+            if (userRisk.value.violationCount >= 3) userRisk.value.muted = true;
         };
 
         let timer = null;
@@ -622,9 +638,9 @@ createApp({
         const rankTab = ref(0);
 
         const feed = ref([
-            { name: '努力变瘦的小猫', time: '10分钟前', sport: 45, content: '今天也是严格执行医生食谱的一天！腰围小了2cm。', isPinned: true, likes: 124, liked: false, comments: [], drName: '徐', drReply: '非常好！腰围的缩小说明内脏脂肪在减少，继续保持。' },
-            { name: '深夜食堂逃兵', time: '半小时前', sport: 60, content: '中午没忍住吃了一块蛋糕，晚上去跑了10公里赎罪。', isPinned: false, likes: 45, liked: false, comments: [], drName: null, drReply: null },
-            { name: '张阿姨要健康', time: '2小时前', sport: 30, content: '刚做完复查，各项指标都正常了！感谢大家鼓励。', isPinned: false, likes: 312, liked: false, comments: [], drName: '王', drReply: '恭喜张阿姨！进入体重维持期也要坚持健康作息。' }
+            { name: '努力变瘦的小猫', time: '10分钟前', sport: 45, weight: 70.8, showWeight: false, content: '今天也是严格执行医生食谱的一天！腰围小了2cm。', isPinned: true, likes: 124, liked: false, comments: [], drName: '徐', drReply: '非常好！腰围的缩小说明内脏脂肪在减少，继续保持。' },
+            { name: '深夜食堂逃兵', time: '半小时前', sport: 60, weight: 82.5, showWeight: true, content: '中午没忍住吃了一块蛋糕，晚上去跑了10公里赎罪。', isPinned: false, likes: 45, liked: false, comments: [], drName: null, drReply: null },
+            { name: '张阿姨要健康', time: '2小时前', sport: 30, weight: 65.2, showWeight: false, content: '刚做完复查，各项指标都正常了！感谢大家鼓励。', isPinned: false, likes: 312, liked: false, comments: [], drName: '王', drReply: '恭喜张阿姨！进入体重维持期也要坚持健康作息。' }
         ]);
 
         const rankList = ref([
@@ -634,7 +650,7 @@ createApp({
         ]);
 
         const resetCheckinForm = () => {
-            checkinForm.value = { weight: '', bodyFat: '', waist: '', hip: '', dietLevel: '1', sportMinutes: '', sportTags: [], stool: 'a', desc: '' };
+            checkinForm.value = { weight: '', bodyFat: '', waist: '', hip: '', dietLevel: '1', sportMinutes: '', sportTags: [], stool: 'a', desc: '', hideWeight: true };
             dietFiles.value = [];
             sportFiles.value = [];
             showBodyMetrics.value = false;
@@ -642,13 +658,25 @@ createApp({
         };
 
         const submitCheckin = () => {
+            if (userRisk.value.muted) {
+                showToast('当前账号因多次敏感词触发已被禁言，请联系医生处理');
+                return;
+            }
             if (!checkinForm.value.weight) {
                 showToast('请先填写今日体重');
                 return;
             }
             const badWord = containsSensitiveWord(checkinForm.value.desc);
             if (badWord) {
+                markViolation();
                 showToast(`动态包含敏感词：${badWord}`);
+                return;
+            }
+            const postLimit = Number(adminSettings.value.postLimit) || 3;
+            const myName = loginForm.value.nickname || '新用户';
+            const myTodayPosts = feed.value.filter((p) => p.name === myName && p.time === '刚刚').length;
+            if (myTodayPosts >= postLimit) {
+                showToast(`今日发布已达上限（${postLimit}次）`);
                 return;
             }
             const baseScore = Number(adminSettings.value.baseScore) || 10;
@@ -663,6 +691,8 @@ createApp({
                 name: loginForm.value.nickname || '新用户',
                 time: '刚刚',
                 sport: Number(checkinForm.value.sportMinutes) || 0,
+                weight: Number(checkinForm.value.weight),
+                showWeight: !checkinForm.value.hideWeight,
                 content: checkinForm.value.desc || '完成今日健康打卡，继续保持！',
                 isPinned: false,
                 likes: 0,
@@ -691,6 +721,10 @@ createApp({
             showCommentDialog.value = true;
         };
         const submitComment = () => {
+            if (userRisk.value.muted) {
+                showToast('当前账号已禁言，暂不可评论');
+                return;
+            }
             if (currentCommentPost.value < 0) return;
             const text = commentText.value.trim();
             if (!text) {
@@ -699,11 +733,24 @@ createApp({
             }
             const badWord = containsSensitiveWord(text);
             if (badWord) {
+                markViolation();
                 showToast(`评论包含敏感词：${badWord}`);
                 return;
             }
             feed.value[currentCommentPost.value].comments.push({ text, by: loginForm.value.nickname || '匿名用户' });
             showToast('评论发布成功');
+        };
+
+        const submitDoctorReply = (idx) => {
+            const text = String(doctorReplyDraft.value[idx] || '').trim();
+            if (!text) {
+                showToast('请输入点评内容');
+                return;
+            }
+            feed.value[idx].drName = '值班';
+            feed.value[idx].drReply = text;
+            doctorReplyDraft.value[idx] = '';
+            showToast('医生点评已发布');
         };
 
         const doctorLike = (idx) => {
@@ -786,8 +833,8 @@ createApp({
             points, checkinDays, todayRank,
             showCommentDialog, commentText, openCommentDialog, submitComment,
             smsCountdown, smsSent, sendSmsCode, goProfileStep,
-            doctorLike, togglePinned, rewardPatient, batchLike,
-            adminSettings, saveAdminSettings, exportCheckins
+            doctorLike, togglePinned, rewardPatient, batchLike, submitDoctorReply, doctorReplyDraft,
+            adminSettings, saveAdminSettings, exportCheckins, userRisk
         };
     }
 }).use(vant).mount('#app');
